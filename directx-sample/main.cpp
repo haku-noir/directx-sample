@@ -20,7 +20,9 @@ using namespace std;
 
 ID3D12Device* _dev = nullptr;
 IDXGIFactory6* _dxgiFactory = nullptr;
-IDXGISwapChain4* _swapchain = nullptr;
+ID3D12CommandAllocator* _cmdAllocator = nullptr;
+ID3D12GraphicsCommandList* _cmdList = nullptr;
+ID3D12CommandQueue* _cmdQueue = nullptr;
 
 D3D_FEATURE_LEVEL levels[] = {
     D3D_FEATURE_LEVEL_12_1,
@@ -28,6 +30,9 @@ D3D_FEATURE_LEVEL levels[] = {
     D3D_FEATURE_LEVEL_11_1,
     D3D_FEATURE_LEVEL_11_0,
 };
+
+#define ASSERT_RES(res) if(res == S_FALSE) return -1
+#define ASSERT_PTR(ptr) if(ptr == nullptr) return -1
 
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == WM_DESTROY) {
@@ -67,7 +72,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         nullptr
     );
 
-    auto result = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+    auto res = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
 
     std::vector<IDXGIAdapter*> adapters;
     IDXGIAdapter* tmpAdapter = nullptr;
@@ -93,9 +98,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             break;
         }
     }
-    if (_dev == nullptr) {
-        return -1;
-    }
+    ASSERT_PTR(_dev);
+
+    res = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
+    ASSERT_RES(res);
+    res = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
+    ASSERT_RES(res);
+
+    D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
+    cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+    cmdQueueDesc.NodeMask = 0;
+    cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+    cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    res = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&_cmdQueue));
+    ASSERT_RES(res);
 
     ShowWindow(hwnd, SW_SHOW);
 
