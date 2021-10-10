@@ -154,15 +154,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     DXGI_SWAP_CHAIN_DESC swcDesc = {};
     res = _swapchain->GetDesc(&swcDesc);
     ASSERT_RES(res, "GetDesc");
+    const UINT descHeapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
     std::vector<ID3D12Resource*> _backBuffers(swcDesc.BufferCount);
     D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
     for (int i = 0; i < swcDesc.BufferCount; ++i) {
         res = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
         ASSERT_RES(res, "GetBuffer");
         _dev->CreateRenderTargetView(_backBuffers[i], nullptr, handle);
-        handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        handle.ptr += descHeapSize;
     }
-
 
     ShowWindow(hwnd, SW_SHOW);
 
@@ -177,6 +178,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         if (msg.message == WM_QUIT) {
             break;
         }
+
+        auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+        auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+        rtvH.ptr += bbIdx * descHeapSize;
+        _cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
+
+        float clearColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };
+        _cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+        _cmdList->Close();
+
+        ID3D12CommandList* cmdlists[] = { _cmdList };
+        _cmdQueue->ExecuteCommandLists(1, cmdlists);
+
+        _cmdAllocator->Reset();
+        _cmdList->Reset(_cmdAllocator, nullptr);
+
+        _swapchain->Present(1, 0);
     }
     UnregisterClass(w.lpszClassName, w.hInstance);
 

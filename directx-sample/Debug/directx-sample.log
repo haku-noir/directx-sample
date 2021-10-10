@@ -1,3 +1,3 @@
 ﻿  main.cpp
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(159,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(161,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
   directx-sample.vcxproj -> C:\Users\hakun\source\repos\directx-sample\Debug\directx-sample.exe
