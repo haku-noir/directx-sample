@@ -23,6 +23,7 @@ IDXGIFactory6* _dxgiFactory = nullptr;
 ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
+IDXGISwapChain4* _swapchain = nullptr;
 
 D3D_FEATURE_LEVEL levels[] = {
     D3D_FEATURE_LEVEL_12_1,
@@ -31,8 +32,20 @@ D3D_FEATURE_LEVEL levels[] = {
     D3D_FEATURE_LEVEL_11_0,
 };
 
-#define ASSERT_RES(res) if(res == S_FALSE) return -1
-#define ASSERT_PTR(ptr) if(ptr == nullptr) return -1
+#define ASSERT_RES(res, s) \
+    do{ \
+        if (res != S_OK) { \
+            cout << "Erorr of res at " << s << endl; \
+            return -1; \
+        } \
+    }while(0)
+#define ASSERT_PTR(ptr, s) \
+    do{ \
+        if (ptr == nullptr) { \
+            cout << "Erorr of ptr at " << s << endl; \
+            return -1; \
+        } \
+    }while(0)
 
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == WM_DESTROY) {
@@ -76,7 +89,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     std::vector<IDXGIAdapter*> adapters;
     IDXGIAdapter* tmpAdapter = nullptr;
-    for(int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++){
+    for(int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i){
         adapters.push_back(tmpAdapter);
     }
 
@@ -98,12 +111,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             break;
         }
     }
-    ASSERT_PTR(_dev);
+    ASSERT_PTR(_dev, "D3D12CreateDevice");
 
     res = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
-    ASSERT_RES(res);
+    ASSERT_RES(res, "CreateCommandAllocator");
     res = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
-    ASSERT_RES(res);
+    ASSERT_RES(res, "CreateCommandList");
 
     D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
     cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -111,7 +124,45 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
     cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     res = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&_cmdQueue));
-    ASSERT_RES(res);
+    ASSERT_RES(res, "CreateCommandQueue");
+
+    DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
+    swapchainDesc.Width = WINDOW_WIDTH;
+    swapchainDesc.Height = WINDOW_HEIGHT;
+    swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    swapchainDesc.Stereo = false;
+    swapchainDesc.SampleDesc.Count = 1;
+    swapchainDesc.SampleDesc.Quality = 0;
+    swapchainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
+    swapchainDesc.BufferCount = 2;
+    swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
+    swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+    swapchainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    res = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue, hwnd, &swapchainDesc, nullptr, nullptr, (IDXGISwapChain1**)&_swapchain);
+    ASSERT_RES(res, "CreateSwapChainForHwnd");
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    heapDesc.NodeMask = 0;
+    heapDesc.NumDescriptors = 2;
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    ID3D12DescriptorHeap* rtvHeaps = nullptr;
+    res = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
+    ASSERT_RES(res, "CreateDescriptorHeap");
+
+    DXGI_SWAP_CHAIN_DESC swcDesc = {};
+    res = _swapchain->GetDesc(&swcDesc);
+    ASSERT_RES(res, "GetDesc");
+    std::vector<ID3D12Resource*> _backBuffers(swcDesc.BufferCount);
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+    for (int i = 0; i < swcDesc.BufferCount; ++i) {
+        res = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
+        ASSERT_RES(res, "GetBuffer");
+        _dev->CreateRenderTargetView(_backBuffers[i], nullptr, handle);
+        handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    }
+
 
     ShowWindow(hwnd, SW_SHOW);
 
