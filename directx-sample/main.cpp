@@ -24,6 +24,8 @@ ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
+ID3D12Fence* _fence = nullptr;
+UINT _fenceVal = 0;
 
 D3D_FEATURE_LEVEL levels[] = {
     D3D_FEATURE_LEVEL_12_1,
@@ -46,6 +48,13 @@ D3D_FEATURE_LEVEL levels[] = {
             return -1; \
         } \
     }while(0)
+
+void EnableDebugLayer() {
+    ID3D12Debug* debugLayer = nullptr;
+    auto res = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
+    debugLayer->EnableDebugLayer();
+    debugLayer->Release();
+}
 
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == WM_DESTROY) {
@@ -85,7 +94,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         nullptr
     );
 
+#ifdef _DEBUG
+    EnableDebugLayer();
+    auto res = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory));
+#else
     auto res = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+#endif // _DEBUG
 
     std::vector<IDXGIAdapter*> adapters;
     IDXGIAdapter* tmpAdapter = nullptr;
@@ -165,6 +179,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         handle.ptr += descHeapSize;
     }
 
+    res = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+    ASSERT_RES(res, "CreateFence");
+
     ShowWindow(hwnd, SW_SHOW);
 
     MSG msg = {};
@@ -190,6 +207,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         ID3D12CommandList* cmdlists[] = { _cmdList };
         _cmdQueue->ExecuteCommandLists(1, cmdlists);
+
+        _cmdQueue->Signal(_fence, ++_fenceVal);
+        if (_fence->GetCompletedValue() != _fenceVal) {
+            auto event = CreateEvent(nullptr, false, false, nullptr);
+            _fence->SetEventOnCompletion(_fenceVal, event);
+            WaitForSingleObject(event, INFINITE);
+            CloseHandle(event);
+        }
 
         _cmdAllocator->Reset();
         _cmdList->Reset(_cmdAllocator, nullptr);
