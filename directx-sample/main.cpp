@@ -184,6 +184,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     ShowWindow(hwnd, SW_SHOW);
 
+    D3D12_RESOURCE_BARRIER barrierDesc = {};
+    barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrierDesc.Transition.Subresource = 0;
+
     MSG msg = {};
 
     while (true) {
@@ -197,12 +202,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         }
 
         auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+
+        barrierDesc.Transition.pResource = _backBuffers[bbIdx];
+        barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+        barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        _cmdList->ResourceBarrier(1, &barrierDesc);
+
         auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
         rtvH.ptr += bbIdx * descHeapSize;
         _cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
         float clearColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };
         _cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+        barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+        _cmdList->ResourceBarrier(1, &barrierDesc);
+
         _cmdList->Close();
 
         ID3D12CommandList* cmdlists[] = { _cmdList };
@@ -218,7 +234,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         _cmdAllocator->Reset();
         _cmdList->Reset(_cmdAllocator, nullptr);
-
         _swapchain->Present(1, 0);
     }
     UnregisterClass(w.lpszClassName, w.hInstance);
