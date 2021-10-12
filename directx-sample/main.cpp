@@ -1,11 +1,12 @@
 #include <Windows.h>
 #include <tchar.h>
 #include <vector>
+#include <DirectXMath.h>
 #ifdef _DEBUG
     #include <iostream>
 #endif // _DEBUG
 
-using namespace std;
+using namespace DirectX;
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -37,14 +38,14 @@ D3D_FEATURE_LEVEL levels[] = {
 #define ASSERT_RES(res, s) \
     do{ \
         if (res != S_OK) { \
-            cout << "Erorr of res at " << s << endl; \
+            std::cout << "Erorr of res at " << s << std::endl; \
             return -1; \
         } \
     }while(0)
 #define ASSERT_PTR(ptr, s) \
     do{ \
         if (ptr == nullptr) { \
-            cout << "Erorr of ptr at " << s << endl; \
+            std::cout << "Erorr of ptr at " << s << std::endl; \
             return -1; \
         } \
     }while(0)
@@ -184,6 +185,43 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     ShowWindow(hwnd, SW_SHOW);
 
+    DirectX::XMFLOAT3 vertices[] = {
+        {-1.0f, -1.0f, 0.0f},
+        {-1.0f,  1.0f, 0.0f},
+        { 1.0f, -1.0f, 0.0f}
+    };
+
+    D3D12_HEAP_PROPERTIES heapProp = {};
+    heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resDesc.Width = sizeof(vertices);
+    resDesc.Height = 1;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ID3D12Resource* vertBuff = nullptr;
+    res = _dev->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertBuff));
+    ASSERT_RES(res, "CreateCommittedResource");
+
+    DirectX::XMFLOAT3* vertMap = nullptr;
+    res = vertBuff->Map(0, nullptr, (void**)&vertMap);
+    ASSERT_RES(res, "Map");
+    std::copy(std::begin(vertices), std::end(vertices), vertMap);
+    vertBuff->Unmap(0, nullptr);
+
+    D3D12_VERTEX_BUFFER_VIEW vbView = {};
+    vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
+    vbView.SizeInBytes = sizeof(vertices);
+    vbView.StrideInBytes = sizeof(vertices[0]);
+
     D3D12_RESOURCE_BARRIER barrierDesc = {};
     barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -212,7 +250,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         rtvH.ptr += bbIdx * descHeapSize;
         _cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
-        float clearColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };
+        float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
         _cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
         barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
