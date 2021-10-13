@@ -200,24 +200,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         {{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}},
     };
 
-    D3D12_HEAP_PROPERTIES heapProp = {};
-    heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    D3D12_HEAP_PROPERTIES vertheapProp = {};
+    vertheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    vertheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    vertheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-    D3D12_RESOURCE_DESC resDesc = {};
-    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resDesc.Width = sizeof(vertices);
-    resDesc.Height = 1;
-    resDesc.DepthOrArraySize = 1;
-    resDesc.MipLevels = 1;
-    resDesc.Format = DXGI_FORMAT_UNKNOWN;
-    resDesc.SampleDesc.Count = 1;
-    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    D3D12_RESOURCE_DESC vertresDesc = {};
+    vertresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    vertresDesc.Width = sizeof(vertices);
+    vertresDesc.Height = 1;
+    vertresDesc.DepthOrArraySize = 1;
+    vertresDesc.MipLevels = 1;
+    vertresDesc.Format = DXGI_FORMAT_UNKNOWN;
+    vertresDesc.SampleDesc.Count = 1;
+    vertresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    vertresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     ID3D12Resource* vertBuff = nullptr;
-    res = _dev->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertBuff));
+    res = _dev->CreateCommittedResource(&vertheapProp, D3D12_HEAP_FLAG_NONE, &vertresDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertBuff));
     ASSERT_RES(res, "CreateCommittedResource");
 
     Vertex* vertMap = nullptr;
@@ -237,8 +237,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     };
 
     ID3D12Resource* idxBuff = nullptr;
-    resDesc.Width = sizeof(indices);
-    res = _dev->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&idxBuff));
+    vertresDesc.Width = sizeof(indices);
+    res = _dev->CreateCommittedResource(&vertheapProp, D3D12_HEAP_FLAG_NONE, &vertresDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&idxBuff));
     ASSERT_RES(res, "CreateCommittedResource");
 
     unsigned short* idxMap = nullptr;
@@ -294,6 +294,44 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             OutputDebugStringA(errstr.c_str());
         }
     }
+
+    struct TexRGBA {
+        unsigned char R, G, B, A;
+    };
+
+    std::vector<TexRGBA> texturedata(256 * 256);
+    for (auto& rgba : texturedata) {
+        rgba.R = rand() % 256;
+        rgba.G = rand() % 256;
+        rgba.B = rand() % 256;
+        rgba.A = 255;
+    }
+
+    D3D12_HEAP_PROPERTIES texheapProp = {};
+    texheapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
+    texheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+    texheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+    texheapProp.CreationNodeMask = 0;
+    texheapProp.VisibleNodeMask = 0;
+
+    D3D12_RESOURCE_DESC texresDesc = {};
+    texresDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texresDesc.Width = 256;
+    texresDesc.Height = 256;
+    texresDesc.DepthOrArraySize = 1;
+    texresDesc.SampleDesc.Count = 1;
+    texresDesc.SampleDesc.Quality = 1;
+    texresDesc.MipLevels = 1;
+    texresDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    texresDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    texresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ID3D12Resource* texBuff = nullptr;
+    res = _dev->CreateCommittedResource(&texheapProp, D3D12_HEAP_FLAG_NONE, &texresDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&texBuff));
+    ASSERT_RES(res, "CreateCommittedResource");
+
+    res = texBuff->WriteToSubresource(0, nullptr, texturedata.data(), sizeof(TexRGBA) * 256, sizeof(TexRGBA) * texturedata.size());
+    ASSERT_RES(res, "WriteToSubresource");
 
     D3D12_ROOT_SIGNATURE_DESC rootsigDesc = {};
     rootsigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;

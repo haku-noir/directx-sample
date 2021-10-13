@@ -1,7 +1,7 @@
 ﻿  main.cpp
 C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(179,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(361,31): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(362,32): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(363,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(364,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(398,31): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(399,32): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(400,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(401,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
   directx-sample.vcxproj -> C:\Users\hakun\source\repos\directx-sample\Debug\directx-sample.exe
