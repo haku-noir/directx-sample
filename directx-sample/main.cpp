@@ -190,8 +190,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     DirectX::XMFLOAT3 vertices[] = {
         {-0.5f, -0.7f, 0.0f},
-        { 0.0f,  0.7f, 0.0f},
-        { 0.5f, -0.7f, 0.0f}
+        {-0.5f,  0.7f, 0.0f},
+        { 0.5f, -0.7f, 0.0f},
+        { 0.5f,  0.7f, 0.0f},
     };
 
     D3D12_HEAP_PROPERTIES heapProp = {};
@@ -224,6 +225,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
     vbView.SizeInBytes = sizeof(vertices);
     vbView.StrideInBytes = sizeof(vertices[0]);
+
+    unsigned short indices[] = {
+        0, 1, 2,
+        2, 1, 3
+    };
+
+    ID3D12Resource* idxBuff = nullptr;
+    resDesc.Width = sizeof(indices);
+    res = _dev->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&idxBuff));
+    ASSERT_RES(res, "CreateCommittedResource");
+
+    unsigned short* idxMap = nullptr;
+    res = idxBuff->Map(0, nullptr, (void**)&idxMap);
+    std::copy(std::begin(indices), std::end(indices), idxMap);
+    idxBuff->Unmap(0, nullptr);
+
+    D3D12_INDEX_BUFFER_VIEW ibView = {};
+    ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
+    ibView.Format = DXGI_FORMAT_R16_UINT;
+    ibView.SizeInBytes = sizeof(indices);
 
     ID3DBlob* vsBlob = nullptr;
     ID3DBlob* psBlob = nullptr;
@@ -361,6 +382,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         _cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         _cmdList->IASetVertexBuffers(0, 1, &vbView);
+        _cmdList->IASetIndexBuffer(&ibView);
 
         auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
 
@@ -376,7 +398,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
         _cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
-        _cmdList->DrawInstanced(3, 1, 0, 0);
+        _cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
         barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
