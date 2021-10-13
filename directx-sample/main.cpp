@@ -160,13 +160,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     res = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue, hwnd, &swapchainDesc, nullptr, nullptr, (IDXGISwapChain1**)&_swapchain);
     ASSERT_RES(res, "CreateSwapChainForHwnd");
 
-    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    heapDesc.NodeMask = 0;
-    heapDesc.NumDescriptors = 2;
-    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    ID3D12DescriptorHeap* rtvHeaps = nullptr;
-    res = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
+    D3D12_DESCRIPTOR_HEAP_DESC rtvheapDesc = {};
+    rtvheapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    rtvheapDesc.NodeMask = 0;
+    rtvheapDesc.NumDescriptors = 2;
+    rtvheapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    ID3D12DescriptorHeap* rtvHeap = nullptr;
+    res = _dev->CreateDescriptorHeap(&rtvheapDesc, IID_PPV_ARGS(&rtvHeap));
     ASSERT_RES(res, "CreateDescriptorHeap");
 
     DXGI_SWAP_CHAIN_DESC swcDesc = {};
@@ -174,19 +175,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ASSERT_RES(res, "GetDesc");
     const UINT descHeapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-    std::vector<ID3D12Resource*> _backBuffers(swcDesc.BufferCount);
-    D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+    std::vector<ID3D12Resource*> backBuffers(swcDesc.BufferCount);
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
     for (int i = 0; i < swcDesc.BufferCount; ++i) {
-        res = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
+        res = _swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffers[i]));
         ASSERT_RES(res, "GetBuffer");
-        _dev->CreateRenderTargetView(_backBuffers[i], nullptr, handle);
+        _dev->CreateRenderTargetView(backBuffers[i], nullptr, handle);
         handle.ptr += descHeapSize;
     }
-
-    res = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
-    ASSERT_RES(res, "CreateFence");
-
-    ShowWindow(hwnd, SW_SHOW);
 
     struct Vertex{
         DirectX::XMFLOAT3 pos;
@@ -333,6 +329,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     res = texBuff->WriteToSubresource(0, nullptr, texturedata.data(), sizeof(TexRGBA) * 256, sizeof(TexRGBA) * texturedata.size());
     ASSERT_RES(res, "WriteToSubresource");
 
+    D3D12_DESCRIPTOR_HEAP_DESC srvheapDesc = {};
+    srvheapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    srvheapDesc.NodeMask = 0;
+    srvheapDesc.NumDescriptors = 0;
+    srvheapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+    ID3D12DescriptorHeap* srvHeap = nullptr;
+    res = _dev->CreateDescriptorHeap(&srvheapDesc, IID_PPV_ARGS(&srvHeap));
+    ASSERT_RES(res, "CreateDescriptorHeap");
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    _dev->CreateShaderResourceView(texBuff, &srvDesc, srvHeap->GetCPUDescriptorHandleForHeapStart());
+
     D3D12_ROOT_SIGNATURE_DESC rootsigDesc = {};
     rootsigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
@@ -401,6 +415,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     scissorrect.right = scissorrect.left + viewport.Width;
     scissorrect.bottom = scissorrect.top + viewport.Height;
 
+    res = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+    ASSERT_RES(res, "CreateFence");
+
+    ShowWindow(hwnd, SW_SHOW);
+
     D3D12_RESOURCE_BARRIER barrierDesc = {};
     barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -430,12 +449,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
 
-        barrierDesc.Transition.pResource = _backBuffers[bbIdx];
+        barrierDesc.Transition.pResource = backBuffers[bbIdx];
         barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
         barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         _cmdList->ResourceBarrier(1, &barrierDesc);
 
-        auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+        auto rtvH = rtvHeap->GetCPUDescriptorHandleForHeapStart();
         rtvH.ptr += bbIdx * descHeapSize;
         _cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
