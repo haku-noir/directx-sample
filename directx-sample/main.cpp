@@ -188,11 +188,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     ShowWindow(hwnd, SW_SHOW);
 
-    DirectX::XMFLOAT3 vertices[] = {
-        {-0.5f, -0.7f, 0.0f},
-        {-0.5f,  0.7f, 0.0f},
-        { 0.5f, -0.7f, 0.0f},
-        { 0.5f,  0.7f, 0.0f},
+    struct Vertex{
+        DirectX::XMFLOAT3 pos;
+        DirectX::XMFLOAT2 vu;
+    };
+
+    Vertex vertices[] = {
+        {{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}},
+        {{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}},
+        {{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}},
+        {{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}},
     };
 
     D3D12_HEAP_PROPERTIES heapProp = {};
@@ -215,7 +220,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     res = _dev->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertBuff));
     ASSERT_RES(res, "CreateCommittedResource");
 
-    DirectX::XMFLOAT3* vertMap = nullptr;
+    Vertex* vertMap = nullptr;
     res = vertBuff->Map(0, nullptr, (void**)&vertMap);
     ASSERT_RES(res, "Map");
     std::copy(std::begin(vertices), std::end(vertices), vertMap);
@@ -325,7 +330,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     gpipelineDesc.BlendState.RenderTarget[0] = rtvblendDesc;
 
     D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
     };
     gpipelineDesc.InputLayout.pInputElementDescs = inputLayout;
     gpipelineDesc.InputLayout.NumElements = _countof(inputLayout);
