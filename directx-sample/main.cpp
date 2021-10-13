@@ -332,7 +332,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     D3D12_DESCRIPTOR_HEAP_DESC srvheapDesc = {};
     srvheapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     srvheapDesc.NodeMask = 0;
-    srvheapDesc.NumDescriptors = 0;
+    srvheapDesc.NumDescriptors = 1;
     srvheapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
     ID3D12DescriptorHeap* srvHeap = nullptr;
@@ -344,11 +344,38 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
-
     _dev->CreateShaderResourceView(texBuff, &srvDesc, srvHeap->GetCPUDescriptorHandleForHeapStart());
+
+    D3D12_ROOT_PARAMETER rootparam = {};
+    rootparam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootparam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_DESCRIPTOR_RANGE descRange = {};
+    descRange.NumDescriptors = 1;
+    descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descRange.BaseShaderRegister = 0;
+    descRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootparam.DescriptorTable.pDescriptorRanges = &descRange;
+    rootparam.DescriptorTable.NumDescriptorRanges = 1;
+
+    D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+    samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    samplerDesc.MinLOD = 0.0f;
+    samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 
     D3D12_ROOT_SIGNATURE_DESC rootsigDesc = {};
     rootsigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    rootsigDesc.pParameters = &rootparam;
+    rootsigDesc.NumParameters = 1;
+    rootsigDesc.pStaticSamplers = &samplerDesc;
+    rootsigDesc.NumStaticSamplers = 1;
 
     ID3DBlob* rootsigBlob = nullptr;
     res = D3D12SerializeRootSignature(&rootsigDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &rootsigBlob, &errorBlob);
@@ -439,6 +466,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         _cmdList->SetPipelineState(piplinestate);
         _cmdList->SetGraphicsRootSignature(rootsignature);
+
+        _cmdList->SetDescriptorHeaps(1, &srvHeap);
+        _cmdList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGPUDescriptorHandleForHeapStart());
 
         _cmdList->RSSetViewports(1, &viewport);
         _cmdList->RSSetScissorRects(1, &scissorrect);
