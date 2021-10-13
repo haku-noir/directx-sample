@@ -1,3 +1,6 @@
-﻿  main.cpp
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(176,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+﻿  compilation object save succeeded; see C:\Users\hakun\source\repos\directx-sample\Debug\BasicVertexShader.cso
+  compilation object save succeeded; see C:\Users\hakun\source\repos\directx-sample\Debug\BasicPixelShader.cso
+  main.cpp
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(179,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+  LINK : 前回のインクリメンタル リンクで C:\Users\hakun\source\repos\directx-sample\Debug\directx-sample.exe が見つからなかったか、ビルドされませんでした。フル リンクを行います。
   directx-sample.vcxproj -> C:\Users\hakun\source\repos\directx-sample\Debug\directx-sample.exe

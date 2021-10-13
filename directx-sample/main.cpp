@@ -13,6 +13,9 @@ using namespace DirectX;
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 
+#include <d3dcompiler.h>
+#pragma comment(lib, "d3dcompiler.lib")
+
 #define WINDOW_CLASS _T("DX12Sample")
 #define WINDOW_TITLE _T("DX12ƒeƒXƒg")
 #define	WINDOW_STYLE WS_OVERLAPPEDWINDOW
@@ -221,6 +224,50 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
     vbView.SizeInBytes = sizeof(vertices);
     vbView.StrideInBytes = sizeof(vertices[0]);
+
+    ID3DBlob* vsBlob = nullptr;
+    ID3DBlob* psBlob = nullptr;
+    ID3DBlob* errorBlob = nullptr;
+
+    res = D3DCompileFromFile(
+        L"BasicVertexShader.hlsl",
+        nullptr,
+        D3D_COMPILE_STANDARD_FILE_INCLUDE,
+        "BasicVS", "vs_5_0",
+        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+        0, &vsBlob, &errorBlob
+    );
+    if (FAILED(res)) {
+        if (res == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+            OutputDebugStringA("File not found");
+        }
+        else {
+            std::string errstr;
+            errstr.resize(errorBlob->GetBufferSize());
+            std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errstr.begin());
+            OutputDebugStringA(errstr.c_str());
+        }
+    }
+
+    res = D3DCompileFromFile(
+        L"BasicPixelShader.hlsl",
+        nullptr,
+        D3D_COMPILE_STANDARD_FILE_INCLUDE,
+        "BasicPS", "ps_5_0",
+        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+        0, &psBlob, &errorBlob
+    );
+    if (FAILED(res)) {
+        if (res == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+            OutputDebugStringA("File not found");
+        }
+        else {
+            std::string errstr;
+            errstr.resize(errorBlob->GetBufferSize());
+            std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errstr.begin());
+            OutputDebugStringA(errstr.c_str());
+        }
+    }
 
     D3D12_RESOURCE_BARRIER barrierDesc = {};
     barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;

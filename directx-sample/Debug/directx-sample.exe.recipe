@@ -5,7 +5,14 @@
       <FullPath>C:\Users\hakun\source\repos\directx-sample\Debug\directx-sample.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
-  <ContentFiles />
+  <ContentFiles>
+    <ContentFile>
+      <FullPath>C:\Users\hakun\source\repos\directx-sample\Debug\BasicVertexShader.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\hakun\source\repos\directx-sample\Debug\BasicPixelShader.cso</FullPath>
+    </ContentFile>
+  </ContentFiles>
   <SatelliteDlls />
   <NonRecipeFileRefs />
 </Project>
