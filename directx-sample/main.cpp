@@ -322,6 +322,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     res = _dev->CreateGraphicsPipelineState(&gpipelineDesc, IID_PPV_ARGS(&piplinestate));
     ASSERT_RES(res, "CreateGraphicsPipelineState");
 
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = WINDOW_WIDTH;
+    viewport.Height = WINDOW_HEIGHT;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    viewport.MaxDepth = 1.0f;
+    viewport.MinDepth = 0.0f;
+
+    D3D12_RECT scissorrect = {};
+    scissorrect.top = viewport.TopLeftY;
+    scissorrect.left = viewport.TopLeftX;
+    scissorrect.right = scissorrect.left + viewport.Width;
+    scissorrect.bottom = scissorrect.top + viewport.Height;
+
     D3D12_RESOURCE_BARRIER barrierDesc = {};
     barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -339,6 +353,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             break;
         }
 
+        _cmdList->SetPipelineState(piplinestate);
+        _cmdList->SetGraphicsRootSignature(rootsignature);
+
+        _cmdList->RSSetViewports(1, &viewport);
+        _cmdList->RSSetScissorRects(1, &scissorrect);
+
+        _cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        _cmdList->IASetVertexBuffers(0, 1, &vbView);
+
         auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
 
         barrierDesc.Transition.pResource = _backBuffers[bbIdx];
@@ -352,6 +375,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
         _cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+        _cmdList->DrawInstanced(3, 1, 0, 0);
 
         barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
