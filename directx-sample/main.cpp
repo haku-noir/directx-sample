@@ -189,9 +189,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ShowWindow(hwnd, SW_SHOW);
 
     DirectX::XMFLOAT3 vertices[] = {
-        {-1.0f, -1.0f, 0.0f},
-        {-1.0f,  1.0f, 0.0f},
-        { 1.0f, -1.0f, 0.0f}
+        {-0.5f, -0.7f, 0.0f},
+        { 0.0f,  0.7f, 0.0f},
+        { 0.5f, -0.7f, 0.0f}
     };
 
     D3D12_HEAP_PROPERTIES heapProp = {};

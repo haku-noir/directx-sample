@@ -1,4 +1,5 @@
-﻿  compilation object save succeeded; see C:\Users\hakun\source\repos\directx-sample\Debug\BasicPixelShader.cso
+﻿  compilation object save succeeded; see C:\Users\hakun\source\repos\directx-sample\Debug\BasicVertexShader.cso
+  compilation object save succeeded; see C:\Users\hakun\source\repos\directx-sample\Debug\BasicPixelShader.cso
   main.cpp
 C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(179,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
 C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(334,31): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
