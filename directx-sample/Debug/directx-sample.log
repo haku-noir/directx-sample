@@ -4,8 +4,8 @@ C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(357,53): warn
 C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(358,46): warning C4267: '=': 'size_t' から 'UINT16' に変換しました。データが失われているかもしれません。
 C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(372,23): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
 C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(487,47): warning C4244: '=': 'UINT64' から 'UINT' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(590,31): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(591,32): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(592,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
-C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(593,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(585,31): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(586,32): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(587,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
+C:\Users\hakun\source\repos\directx-sample\directx-sample\main.cpp(588,42): warning C4244: '=': 'FLOAT' から 'LONG' への変換です。データが失われる可能性があります。
   directx-sample.vcxproj -> C:\Users\hakun\source\repos\directx-sample\Debug\directx-sample.exe

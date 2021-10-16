@@ -498,16 +498,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     descRanges[1].BaseShaderRegister = 0;
     descRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootparams[2] = {};
-    rootparams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootparams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootparams[0].DescriptorTable.pDescriptorRanges = &descRanges[0];
-    rootparams[0].DescriptorTable.NumDescriptorRanges = 1;
-
-    rootparams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootparams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-    rootparams[1].DescriptorTable.pDescriptorRanges = &descRanges[1];
-    rootparams[1].DescriptorTable.NumDescriptorRanges = 1;
+    D3D12_ROOT_PARAMETER rootparam = {};
+    rootparam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootparam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    rootparam.DescriptorTable.pDescriptorRanges = descRanges;
+    rootparam.DescriptorTable.NumDescriptorRanges = 2;
 
     D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
     samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -522,8 +517,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     D3D12_ROOT_SIGNATURE_DESC rootsigDesc = {};
     rootsigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-    rootsigDesc.pParameters = rootparams;
-    rootsigDesc.NumParameters = 2;
+    rootsigDesc.pParameters = &rootparam;
+    rootsigDesc.NumParameters = 1;
     rootsigDesc.pStaticSamplers = &samplerDesc;
     rootsigDesc.NumStaticSamplers = 1;
 
@@ -632,8 +627,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         _cmdList->SetDescriptorHeaps(1, &basicHeap);
         auto basicH = basicHeap->GetGPUDescriptorHandleForHeapStart();
         _cmdList->SetGraphicsRootDescriptorTable(0, basicH);
-        basicH.ptr += basicheapSize;
-        _cmdList->SetGraphicsRootDescriptorTable(1, basicH);
 
         _cmdList->RSSetViewports(1, &viewport);
         _cmdList->RSSetScissorRects(1, &scissorrect);
