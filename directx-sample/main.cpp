@@ -183,7 +183,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     DXGI_SWAP_CHAIN_DESC swcDesc = {};
     res = _swapchain->GetDesc(&swcDesc);
     ASSERT_RES(res, "GetDesc");
-    const UINT descHeapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
     rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
@@ -191,11 +190,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     std::vector<ID3D12Resource*> backBuffers(swcDesc.BufferCount);
     D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    const UINT rtvheapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     for (int i = 0; i < swcDesc.BufferCount; ++i) {
         res = _swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffers[i]));
         ASSERT_RES(res, "GetBuffer");
         _dev->CreateRenderTargetView(backBuffers[i], &rtvDesc, handle);
-        handle.ptr += descHeapSize;
+        handle.ptr += rtvheapSize;
     }
 
     struct Vertex{
@@ -416,35 +416,83 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         _cmdList->Reset(_cmdAllocator, nullptr);
     }
 
-    D3D12_DESCRIPTOR_HEAP_DESC srvheapDesc = {};
-    srvheapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    srvheapDesc.NodeMask = 0;
-    srvheapDesc.NumDescriptors = 1;
-    srvheapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    DirectX::XMMATRIX matrix = DirectX::XMMatrixIdentity();
 
-    ID3D12DescriptorHeap* srvHeap = nullptr;
-    res = _dev->CreateDescriptorHeap(&srvheapDesc, IID_PPV_ARGS(&srvHeap));
+    D3D12_HEAP_PROPERTIES constheapProp = {};
+    constheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    constheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    constheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    constheapProp.CreationNodeMask = 0;
+    constheapProp.VisibleNodeMask = 0;
+
+    D3D12_RESOURCE_DESC constresDesc = {};
+    constresDesc.Format = DXGI_FORMAT_UNKNOWN;
+    constresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    constresDesc.Width = (sizeof(matrix) + 0xff) & ~0xff;
+    constresDesc.Height = 1;
+    constresDesc.DepthOrArraySize = 1;
+    constresDesc.MipLevels = 1;
+    constresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    constresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    constresDesc.SampleDesc.Count = 1;
+    constresDesc.SampleDesc.Quality = 0;
+
+    ID3D12Resource* constBuff = nullptr;
+    res = _dev->CreateCommittedResource(&constheapProp, D3D12_HEAP_FLAG_NONE, &constresDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&constBuff));
+    ASSERT_RES(res, "CreateCommittedResource");
+
+    DirectX::XMMATRIX* matrixMap;
+    res = constBuff->Map(0, nullptr, (void**)&matrixMap);
+    *matrixMap = matrix;
+
+    D3D12_DESCRIPTOR_HEAP_DESC basicheapDesc = {};
+    basicheapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    basicheapDesc.NodeMask = 0;
+    basicheapDesc.NumDescriptors = 2;
+    basicheapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+    ID3D12DescriptorHeap* basicHeap = nullptr;
+    res = _dev->CreateDescriptorHeap(&basicheapDesc, IID_PPV_ARGS(&basicHeap));
     ASSERT_RES(res, "CreateDescriptorHeap");
+
+    auto basicheapHandle = basicHeap->GetCPUDescriptorHandleForHeapStart();
+    const UINT basicheapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = metadata.format;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
-    _dev->CreateShaderResourceView(texBuff, &srvDesc, srvHeap->GetCPUDescriptorHandleForHeapStart());
+    _dev->CreateShaderResourceView(texBuff, &srvDesc, basicheapHandle);
 
-    D3D12_ROOT_PARAMETER rootparam = {};
-    rootparam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootparam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    basicheapHandle.ptr += basicheapSize;
 
-    D3D12_DESCRIPTOR_RANGE descRange = {};
-    descRange.NumDescriptors = 1;
-    descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descRange.BaseShaderRegister = 0;
-    descRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
+    _dev->CreateConstantBufferView(&cbvDesc, basicheapHandle);
 
-    rootparam.DescriptorTable.pDescriptorRanges = &descRange;
-    rootparam.DescriptorTable.NumDescriptorRanges = 1;
+    D3D12_DESCRIPTOR_RANGE descRanges[2] = {};
+    descRanges[0].NumDescriptors = 1;
+    descRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descRanges[0].BaseShaderRegister = 0;
+    descRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    descRanges[1].NumDescriptors = 1;
+    descRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    descRanges[1].BaseShaderRegister = 0;
+    descRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    D3D12_ROOT_PARAMETER rootparams[2] = {};
+    rootparams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootparams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootparams[0].DescriptorTable.pDescriptorRanges = &descRanges[0];
+    rootparams[0].DescriptorTable.NumDescriptorRanges = 1;
+
+    rootparams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootparams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    rootparams[1].DescriptorTable.pDescriptorRanges = &descRanges[1];
+    rootparams[1].DescriptorTable.NumDescriptorRanges = 1;
 
     D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
     samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -459,8 +507,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     D3D12_ROOT_SIGNATURE_DESC rootsigDesc = {};
     rootsigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-    rootsigDesc.pParameters = &rootparam;
-    rootsigDesc.NumParameters = 1;
+    rootsigDesc.pParameters = rootparams;
+    rootsigDesc.NumParameters = 2;
     rootsigDesc.pStaticSamplers = &samplerDesc;
     rootsigDesc.NumStaticSamplers = 1;
 
@@ -554,8 +602,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         _cmdList->SetPipelineState(piplinestate);
         _cmdList->SetGraphicsRootSignature(rootsignature);
 
-        _cmdList->SetDescriptorHeaps(1, &srvHeap);
-        _cmdList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGPUDescriptorHandleForHeapStart());
+        _cmdList->SetDescriptorHeaps(1, &basicHeap);
+        auto basicH = basicHeap->GetGPUDescriptorHandleForHeapStart();
+        _cmdList->SetGraphicsRootDescriptorTable(0, basicH);
+        basicH.ptr += basicheapSize;
+        _cmdList->SetGraphicsRootDescriptorTable(1, basicH);
 
         _cmdList->RSSetViewports(1, &viewport);
         _cmdList->RSSetScissorRects(1, &scissorrect);
@@ -572,7 +623,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         _cmdList->ResourceBarrier(1, &barrierDesc);
 
         auto rtvH = rtvHeap->GetCPUDescriptorHandleForHeapStart();
-        rtvH.ptr += bbIdx * descHeapSize;
+        rtvH.ptr += bbIdx * rtvheapSize;
         _cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
         float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
