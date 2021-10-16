@@ -56,6 +56,10 @@ D3D_FEATURE_LEVEL levels[] = {
         } \
     }while(0)
 
+size_t AlignmentedSize(size_t size, size_t alignment) {
+    return size + alignment - size % alignment;
+}
+
 void EnableDebugLayer() {
     ID3D12Debug* debugLayer = nullptr;
     auto res = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
@@ -308,31 +312,109 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ASSERT_RES(res, "LoadFromWICFile");
     auto img = scratchImg.GetImage(0, 0, 0);
 
+    D3D12_HEAP_PROPERTIES texuploadheapProp = {};
+    texuploadheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    texuploadheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    texuploadheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    texuploadheapProp.CreationNodeMask = 0;
+    texuploadheapProp.VisibleNodeMask = 0;
+
+    D3D12_RESOURCE_DESC texresDesc = {};
+    texresDesc.Format = DXGI_FORMAT_UNKNOWN;
+    texresDesc.Width = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) * img->height;
+    texresDesc.Height = 1;
+    texresDesc.DepthOrArraySize = 1;
+    texresDesc.MipLevels = 1;
+    texresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    texresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    texresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    texresDesc.SampleDesc.Count = 1;
+    texresDesc.SampleDesc.Quality = 0;
+
+    ID3D12Resource* texuploadBuff = nullptr;
+    res = _dev->CreateCommittedResource(&texuploadheapProp, D3D12_HEAP_FLAG_NONE, &texresDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&texuploadBuff));
+    ASSERT_RES(res, "CreateCommittedResource");
+
     D3D12_HEAP_PROPERTIES texheapProp = {};
-    texheapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
-    texheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
-    texheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+    texheapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
+    texheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    texheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
     texheapProp.CreationNodeMask = 0;
     texheapProp.VisibleNodeMask = 0;
 
-    D3D12_RESOURCE_DESC texresDesc = {};
     texresDesc.Format = metadata.format;
     texresDesc.Width = metadata.width;
     texresDesc.Height = metadata.height;
     texresDesc.DepthOrArraySize = metadata.arraySize;
-    texresDesc.SampleDesc.Count = 1;
-    texresDesc.SampleDesc.Quality = 1;
     texresDesc.MipLevels = metadata.mipLevels;
     texresDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);
     texresDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     texresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
     ID3D12Resource* texBuff = nullptr;
-    res = _dev->CreateCommittedResource(&texheapProp, D3D12_HEAP_FLAG_NONE, &texresDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&texBuff));
+    res = _dev->CreateCommittedResource(&texheapProp, D3D12_HEAP_FLAG_NONE, &texresDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&texBuff));
     ASSERT_RES(res, "CreateCommittedResource");
 
-    res = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch,img->slicePitch);
-    ASSERT_RES(res, "WriteToSubresource");
+    uint8_t* texMap = nullptr;
+    res = texuploadBuff->Map(0, nullptr, (void**)&texMap);
+
+    auto srcAddr = img->pixels;
+    auto rowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    for (int y = 0; y < img->height; ++y) {
+        std::copy_n(srcAddr, img->rowPitch, texMap);
+        srcAddr += img->rowPitch;
+        texMap += rowPitch;
+    }
+    texuploadBuff->Unmap(0, nullptr);
+
+    D3D12_TEXTURE_COPY_LOCATION srctexLocation = {};
+    srctexLocation.pResource = texuploadBuff;
+    srctexLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srctexLocation.PlacedFootprint.Offset = 0;
+    srctexLocation.PlacedFootprint.Footprint.Width = metadata.width;
+    srctexLocation.PlacedFootprint.Footprint.Height = metadata.height;
+    srctexLocation.PlacedFootprint.Footprint.Depth = metadata.depth;
+    srctexLocation.PlacedFootprint.Footprint.RowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    srctexLocation.PlacedFootprint.Footprint.Format = img->format;
+
+    D3D12_TEXTURE_COPY_LOCATION dsttexLocation = {};
+    dsttexLocation.pResource = texBuff;
+    dsttexLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dsttexLocation.SubresourceIndex = 0;
+
+    {
+        _cmdList->CopyTextureRegion(&dsttexLocation, 0, 0, 0, &srctexLocation, nullptr);
+
+        D3D12_RESOURCE_BARRIER barrierDesc = {};
+        barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barrierDesc.Transition.pResource = texBuff;
+        barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+        _cmdList->ResourceBarrier(1, &barrierDesc);
+        _cmdList->Close();
+
+        ID3D12CommandList* cmdlists[] = { _cmdList };
+        _cmdQueue->ExecuteCommandLists(1, cmdlists);
+
+        ID3D12Fence* fence = nullptr;
+        UINT fenceVal = 0;
+        res = _dev->CreateFence(fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+        ASSERT_RES(res, "CreateFence");
+
+        _cmdQueue->Signal(fence, ++fenceVal);
+        if (fence->GetCompletedValue() != fenceVal) {
+            auto event = CreateEvent(nullptr, false, false, nullptr);
+            fence->SetEventOnCompletion(fenceVal, event);
+            WaitForSingleObject(event, INFINITE);
+            CloseHandle(event);
+        }
+
+        _cmdAllocator->Reset();
+        _cmdList->Reset(_cmdAllocator, nullptr);
+    }
 
     D3D12_DESCRIPTOR_HEAP_DESC srvheapDesc = {};
     srvheapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
