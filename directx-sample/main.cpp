@@ -16,6 +16,9 @@ using namespace DirectX;
 #include <d3dcompiler.h>
 #pragma comment(lib, "d3dcompiler.lib")
 
+#include <DirectXTex.h>
+#pragma comment(lib, "DirectXTex.lib")
+
 #define WINDOW_CLASS _T("DX12Sample")
 #define WINDOW_TITLE _T("DX12ƒeƒXƒg")
 #define	WINDOW_STYLE WS_OVERLAPPEDWINDOW
@@ -98,11 +101,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         nullptr
     );
 
+    auto res = CoInitializeEx(0, COINIT_MULTITHREADED);
+    ASSERT_RES(res, "CoInitializeEx");
+
 #ifdef _DEBUG
     EnableDebugLayer();
-    auto res = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory));
+    res = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory));
 #else
-    auto res = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+    res = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
 #endif // _DEBUG
 
     std::vector<IDXGIAdapter*> adapters;
@@ -175,12 +181,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ASSERT_RES(res, "GetDesc");
     const UINT descHeapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
     std::vector<ID3D12Resource*> backBuffers(swcDesc.BufferCount);
     D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
     for (int i = 0; i < swcDesc.BufferCount; ++i) {
         res = _swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffers[i]));
         ASSERT_RES(res, "GetBuffer");
-        _dev->CreateRenderTargetView(backBuffers[i], nullptr, handle);
+        _dev->CreateRenderTargetView(backBuffers[i], &rtvDesc, handle);
         handle.ptr += descHeapSize;
     }
 
@@ -291,17 +301,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         }
     }
 
-    struct TexRGBA {
-        unsigned char R, G, B, A;
-    };
+    DirectX::TexMetadata metadata = {};
+    DirectX::ScratchImage scratchImg = {};
 
-    std::vector<TexRGBA> texturedata(256 * 256);
-    for (auto& rgba : texturedata) {
-        rgba.R = rand() % 256;
-        rgba.G = rand() % 256;
-        rgba.B = rand() % 256;
-        rgba.A = 255;
-    }
+    res = DirectX::LoadFromWICFile(L"img/textest.png", DirectX::WIC_FLAGS_NONE, &metadata, scratchImg);
+    ASSERT_RES(res, "LoadFromWICFile");
+    auto img = scratchImg.GetImage(0, 0, 0);
 
     D3D12_HEAP_PROPERTIES texheapProp = {};
     texheapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
@@ -311,14 +316,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     texheapProp.VisibleNodeMask = 0;
 
     D3D12_RESOURCE_DESC texresDesc = {};
-    texresDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    texresDesc.Width = 256;
-    texresDesc.Height = 256;
-    texresDesc.DepthOrArraySize = 1;
+    texresDesc.Format = metadata.format;
+    texresDesc.Width = metadata.width;
+    texresDesc.Height = metadata.height;
+    texresDesc.DepthOrArraySize = metadata.arraySize;
     texresDesc.SampleDesc.Count = 1;
     texresDesc.SampleDesc.Quality = 1;
-    texresDesc.MipLevels = 1;
-    texresDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    texresDesc.MipLevels = metadata.mipLevels;
+    texresDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);
     texresDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     texresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
@@ -326,7 +331,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     res = _dev->CreateCommittedResource(&texheapProp, D3D12_HEAP_FLAG_NONE, &texresDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&texBuff));
     ASSERT_RES(res, "CreateCommittedResource");
 
-    res = texBuff->WriteToSubresource(0, nullptr, texturedata.data(), sizeof(TexRGBA) * 256, sizeof(TexRGBA) * texturedata.size());
+    res = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch,img->slicePitch);
     ASSERT_RES(res, "WriteToSubresource");
 
     D3D12_DESCRIPTOR_HEAP_DESC srvheapDesc = {};
@@ -340,7 +345,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ASSERT_RES(res, "CreateDescriptorHeap");
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.Format = metadata.format;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
@@ -419,7 +424,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     gpipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
     gpipelineDesc.NumRenderTargets = 1;
-    gpipelineDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    gpipelineDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
     gpipelineDesc.SampleDesc.Count = 1;
     gpipelineDesc.SampleDesc.Quality = 0;
