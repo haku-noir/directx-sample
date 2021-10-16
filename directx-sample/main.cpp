@@ -199,16 +199,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     }
 
     struct Vertex{
-        DirectX::XMFLOAT3 pos;
-        DirectX::XMFLOAT2 vu;
+        XMFLOAT3 pos;
+        XMFLOAT2 vu;
     };
 
     Vertex vertices[] = {
-        {{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}},
-        {{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}},
-        {{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}},
-        {{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}},
+        {{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
+        {{-1.0f,  1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{ 1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+        {{ 1.0f,  1.0f, 0.0f}, {1.0f, 0.0f}},
     };
+
+    /*
+    Vertex vertices[] = {
+        {{  0.0f, 100.0f,   0.0f}, {0.0f, 1.0f}},
+        {{  0.0f,   0.0f,   0.0f}, {0.0f, 0.0f}},
+        {{100.0f, 100.0f,   0.0f}, {1.0f, 1.0f}},
+        {{100.0f,   0.0f,   0.0f}, {1.0f, 0.0f}},
+    };
+    */
 
     D3D12_HEAP_PROPERTIES vertheapProp = {};
     vertheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -305,10 +314,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         }
     }
 
-    DirectX::TexMetadata metadata = {};
-    DirectX::ScratchImage scratchImg = {};
+    TexMetadata metadata = {};
+    ScratchImage scratchImg = {};
 
-    res = DirectX::LoadFromWICFile(L"img/textest.png", DirectX::WIC_FLAGS_NONE, &metadata, scratchImg);
+    res = LoadFromWICFile(L"img/textest.png", WIC_FLAGS_NONE, &metadata, scratchImg);
     ASSERT_RES(res, "LoadFromWICFile");
     auto img = scratchImg.GetImage(0, 0, 0);
 
@@ -416,7 +425,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         _cmdList->Reset(_cmdAllocator, nullptr);
     }
 
-    DirectX::XMMATRIX matrix = DirectX::XMMatrixIdentity();
+    XMMATRIX matrix = XMMatrixIdentity();
+    /*
+    matrix.r[0].m128_f32[0] =  2.0f / WINDOW_WIDTH;
+    matrix.r[1].m128_f32[1] = -2.0f / WINDOW_HEIGHT;
+    matrix.r[3].m128_f32[0] = -1.0f;
+    matrix.r[3].m128_f32[1] =  1.0f;
+    */
 
     D3D12_HEAP_PROPERTIES constheapProp = {};
     constheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -441,7 +456,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     res = _dev->CreateCommittedResource(&constheapProp, D3D12_HEAP_FLAG_NONE, &constresDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&constBuff));
     ASSERT_RES(res, "CreateCommittedResource");
 
-    DirectX::XMMATRIX* matrixMap;
+    XMMATRIX* matrixMap;
     res = constBuff->Map(0, nullptr, (void**)&matrixMap);
     *matrixMap = matrix;
 
@@ -589,6 +604,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     MSG msg = {};
 
+    float angle = 0.0f;
+    auto worldMat = XMMatrixRotationY(angle);
+    XMFLOAT3 eye(0, 0, -5);
+    XMFLOAT3 target(0, 0, 0);
+    XMFLOAT3 up(0, 1, 0);
+    auto viewMat = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+    auto projMat = XMMatrixPerspectiveFovLH(XM_PIDIV2, static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT), 1.0f, 10.0f);
+
     while (true) {
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
@@ -598,6 +621,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         if (msg.message == WM_QUIT) {
             break;
         }
+
+        angle += 0.1f;
+        worldMat = XMMatrixRotationY(angle);
+        *matrixMap = worldMat * viewMat * projMat;
 
         _cmdList->SetPipelineState(piplinestate);
         _cmdList->SetGraphicsRootSignature(rootsignature);
