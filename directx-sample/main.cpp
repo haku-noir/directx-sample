@@ -471,7 +471,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     ASSERT_RES(res, "CreateDescriptorHeap");
 
     auto basicheapHandle = basicHeap->GetCPUDescriptorHandleForHeapStart();
-    const UINT basicheapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    const UINT basicheapSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = metadata.format;
